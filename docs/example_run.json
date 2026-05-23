@@ -1,0 +1,29 @@
+{
+  "job_id": "sample01",
+  "status": "completed",
+  "elapsed": 45.2,
+  "agents": {
+    "unit_tests": "completed",
+    "integration_tests": "completed",
+    "fuzz_tests": "completed",
+    "edge_case_tests": "completed",
+    "mocks": "completed"
+  },
+  "files": {
+    "test/Unit.t.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"forge-std/Test.sol\";\nimport \"../src/Counter.sol\";\n\ncontract CounterUnitTest is Test {\n    Counter counter;\n    address owner = address(this);\n    address user = address(0x1);\n\n    function setUp() public {\n        counter = new Counter();\n    }\n\n    function test_increment() public {\n        counter.increment();\n        assertEq(counter.count(), 1);\n    }\n\n    function test_increment_multiple() public {\n        counter.increment();\n        counter.increment();\n        counter.increment();\n        assertEq(counter.count(), 3);\n    }\n\n    function test_decrement() public {\n        counter.increment();\n        counter.increment();\n        counter.decrement();\n        assertEq(counter.count(), 1);\n    }\n\n    function test_decrement_revertsAtZero() public {\n        vm.expectRevert(\"Cannot go below zero\");\n        counter.decrement();\n    }\n\n    function test_reset_onlyOwner() public {\n        counter.increment();\n        counter.reset();\n        assertEq(counter.count(), 0);\n    }\n\n    function test_reset_revertsIfNotOwner() public {\n        counter.increment();\n        vm.prank(user);\n        vm.expectRevert(\"Not owner\");\n        counter.reset();\n    }\n\n    function test_owner_is_set() public {\n        assertEq(counter.owner(), owner);\n    }\n}",
+    "test/Integration.t.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"forge-std/Test.sol\";\nimport \"../src/Counter.sol\";\n\ncontract CounterIntegrationTest is Test {\n    Counter counter;\n    address alice = address(0xA);\n    address bob = address(0xB);\n\n    function setUp() public {\n        counter = new Counter();\n    }\n\n    function test_multiUserFlow() public {\n        vm.prank(alice);\n        counter.increment();\n        vm.prank(bob);\n        counter.increment();\n        vm.prank(alice);\n        counter.increment();\n        assertEq(counter.count(), 3);\n    }\n\n    function test_incrementThenReset() public {\n        counter.increment();\n        counter.increment();\n        counter.reset();\n        assertEq(counter.count(), 0);\n    }\n\n    function test_fullLifecycle() public {\n        for (uint i = 0; i < 10; i++) {\n            counter.increment();\n        }\n        assertEq(counter.count(), 10);\n        counter.decrement();\n        assertEq(counter.count(), 9);\n        counter.reset();\n        assertEq(counter.count(), 0);\n    }\n}",
+    "test/Fuzz.t.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"forge-std/Test.sol\";\nimport \"../src/Counter.sol\";\n\ncontract CounterFuzzTest is Test {\n    Counter counter;\n\n    function setUp() public {\n        counter = new Counter();\n    }\n\n    function testFuzz_incrementNeverUnderflows(uint8 n) public {\n        for (uint i = 0; i < n; i++) {\n            counter.increment();\n        }\n        assertTrue(counter.count() >= 0);\n        assertEq(counter.count(), n);\n    }\n\n    function testFuzz_incrementDecrementBalance(uint8 incs, uint8 decs) public {\n        vm.assume(decs <= incs);\n        for (uint i = 0; i < incs; i++) counter.increment();\n        for (uint i = 0; i < decs; i++) counter.decrement();\n        assertEq(counter.count(), incs - decs);\n    }\n}",
+    "test/EdgeCase.t.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"forge-std/Test.sol\";\nimport \"../src/Counter.sol\";\n\ncontract CounterEdgeCaseTest is Test {\n    Counter counter;\n\n    function setUp() public {\n        counter = new Counter();\n    }\n\n    function test_zeroState() public {\n        assertEq(counter.count(), 0);\n    }\n\n    function test_resetOnZeroState() public {\n        counter.reset();\n        assertEq(counter.count(), 0);\n    }\n\n    function test_incrementFromZero() public {\n        counter.increment();\n        assertEq(counter.count(), 1);\n    }\n\n    function test_manyOperations() public {\n        for (uint i = 0; i < 1000; i++) {\n            counter.increment();\n        }\n        assertEq(counter.count(), 1000);\n        for (uint i = 0; i < 1000; i++) {\n            counter.decrement();\n        }\n        assertEq(counter.count(), 0);\n    }\n}",
+    "test/mocks/Mocks.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"../src/Counter.sol\";\n\ncontract MaliciousReentrancer {\n    Counter target;\n    bool public attackEnabled;\n\n    constructor(Counter _target) {\n        target = _target;\n    }\n\n    function attack() external {\n        attackEnabled = true;\n        target.increment();\n        attackEnabled = false;\n    }\n}",
+    "test/helpers/TestHelpers.sol": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.19;\n\nimport \"forge-std/Test.sol\";\nimport \"../src/Counter.sol\";\n\ncontract TestHelpers is Test {\n    function deployCounter() internal returns (Counter) {\n        return new Counter();\n    }\n\n    function incrementN(Counter c, uint n) internal {\n        for (uint i = 0; i < n; i++) {\n            c.increment();\n        }\n    }\n}"
+  },
+  "token_usage": {
+    "unit_test_generator": {"prompt_tokens": 2100, "completion_tokens": 1800},
+    "integration_test_generator": {"prompt_tokens": 2100, "completion_tokens": 1500},
+    "fuzz_test_generator": {"prompt_tokens": 2100, "completion_tokens": 1200},
+    "edge_case_generator": {"prompt_tokens": 2100, "completion_tokens": 1100},
+    "mock_generator": {"prompt_tokens": 2100, "completion_tokens": 800},
+    "synthesis": {"prompt_tokens": 8500, "completion_tokens": 4200},
+    "total": 27500
+  }
+}
