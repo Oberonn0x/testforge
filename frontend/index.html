@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TestForge — Solidity Test Suite Builder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0a0f; color: #e0e0e0; min-height: 100vh; }
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+        header { text-align: center; margin-bottom: 2rem; }
+        h1 { font-size: 2.5rem; background: linear-gradient(135deg, #f97316, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .subtitle { color: #888; margin-top: 0.5rem; }
+        .card { background: #14141f; border: 1px solid #2a2a3a; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        textarea { width: 100%; min-height: 300px; background: #0d0d15; border: 1px solid #333; border-radius: 8px; color: #e0e0e0; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.9rem; resize: vertical; }
+        .actions { display: flex; gap: 1rem; margin-top: 1rem; align-items: center; }
+        button { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, #f97316, #ef4444); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(249,115,22,0.3); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #2a2a3a; color: #e0e0e0; }
+        input[type="file"] { display: none; }
+        .status { padding: 1rem; border-radius: 8px; margin-top: 1rem; display: none; }
+        .status.running { display: block; background: #1a1a2e; border: 1px solid #333; }
+        .status.completed { display: block; background: #0d2818; border: 1px solid #16a34a; }
+        .status.failed { display: block; background: #2d0d0d; border: 1px solid #dc2626; }
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #f97316; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 0.5rem; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .files-list { list-style: none; }
+        .files-list li { padding: 0.5rem 0; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+        .files-list li:last-child { border-bottom: none; }
+        .file-name { font-family: monospace; color: #f97316; }
+        .btn-download { padding: 0.3rem 0.8rem; font-size: 0.8rem; background: #1e40af; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .stat-box { text-align: center; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: #f97316; }
+        .stat-label { font-size: 0.85rem; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔨 TestForge</h1>
+            <p class="subtitle">Multi-Agent Automated Solidity Test Suite Builder</p>
+        </header>
+
+        <div class="card">
+            <h2 style="margin-bottom:1rem;">Upload Solidity</h2>
+            <textarea id="codeInput" placeholder="Paste your Solidity contract code here..."></textarea>
+            <div class="actions">
+                <button class="btn-primary" id="generateBtn" onclick="generate()">🔨 Generate Test Suite</button>
+                <label class="btn-secondary" style="padding:0.75rem 1.5rem;border-radius:8px;cursor:pointer;">📁 Upload .sol File<input type="file" id="fileInput" accept=".sol" onchange="loadFile(event)"></label>
+            </div>
+        </div>
+
+        <div class="card status" id="statusCard">
+            <p id="statusText"><span class="spinner"></span>Initializing...</p>
+        </div>
+
+        <div class="card" id="resultsCard" style="display:none;">
+            <h2 style="margin-bottom:1rem;">📦 Generated Test Files</h2>
+            <ul class="files-list" id="filesList"></ul>
+        </div>
+
+        <div class="card" id="statsCard">
+            <h2 style="margin-bottom:1rem;">📊 Token Usage</h2>
+            <div class="stats" id="statsBox">
+                <div class="stat-box"><div class="stat-value" id="totalTokens">-</div><div class="stat-label">Total Tokens</div></div>
+                <div class="stat-box"><div class="stat-value" id="totalCalls">-</div><div class="stat-label">API Calls</div></div>
+                <div class="stat-box"><div class="stat-value" id="totalAgents">-</div><div class="stat-label">Agents Used</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+
+        function loadFile(e) {
+            const reader = new FileReader();
+            reader.onload = (ev) => { document.getElementById('codeInput').value = ev.target.result; };
+            reader.readAsText(e.target.files[0]);
+        }
+
+        async function generate() {
+            const code = document.getElementById('codeInput').value.trim();
+            if (!code) { alert('Please paste Solidity code or upload a file.'); return; }
+
+            const btn = document.getElementById('generateBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Generating...';
+            document.getElementById('statusCard').className = 'card status running';
+            document.getElementById('statusText').innerHTML = '<span class="spinner"></span>Sending to 5 AI agents...';
+            document.getElementById('resultsCard').style.display = 'none';
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ solidity_code: code })
+                });
+                const data = await res.json();
+                currentJobId = data.job_id;
+                pollStatus();
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        async function pollStatus() {
+            const res = await fetch(`/api/generate/${currentJobId}`);
+            const job = await res.json();
+            const statusText = document.getElementById('statusText');
+
+            if (job.status === 'completed') {
+                document.getElementById('statusCard').className = 'card status completed';
+                statusText.innerHTML = `✅ Done in ${job.elapsed?.toFixed(1)}s`;
+                showResults(job.files);
+            } else if (job.status === 'failed') {
+                showError(job.error || 'Unknown error');
+            } else {
+                const phase = job.status === 'generating_agents' ? 'Generating with 5 agents...' : 'Synthesizing test suite...';
+                statusText.innerHTML = `<span class="spinner"></span>${phase}`;
+                setTimeout(pollStatus, 2000);
+            }
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').textContent = '🔨 Generate Test Suite';
+            loadStats();
+        }
+
+        function showResults(files) {
+            const list = document.getElementById('filesList');
+            list.innerHTML = '';
+            for (const [path, content] of Object.entries(files)) {
+                const li = document.createElement('li');
+                li.innerHTML = `<span class="file-name">${path}</span><button class="btn-download" onclick="downloadFile('${path}')">Download</button>`;
+                li.dataset.content = content;
+                list.appendChild(li);
+            }
+            document.getElementById('resultsCard').style.display = 'block';
+        }
+
+        function downloadFile(filename) {
+            const li = [...document.querySelectorAll('.files-list li')].find(l => l.querySelector('.file-name').textContent === filename);
+            const blob = new Blob([li.dataset.content], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename.split('/').pop();
+            a.click();
+        }
+
+        function showError(msg) {
+            const card = document.getElementById('statusCard');
+            card.className = 'card status failed';
+            document.getElementById('statusText').textContent = '❌ ' + msg;
+            document.getElementById('generateBtn').disabled = false;
+            document.getElementById('generateBtn').textContent = '🔨 Generate Test Suite';
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('totalTokens').textContent = (data.grand_total_tokens || 0).toLocaleString();
+                document.getElementById('totalCalls').textContent = data.total_api_calls || 0;
+                document.getElementById('totalAgents').textContent = data.agents?.length || 0;
+            } catch (e) {}
+        }
+
+        loadStats();
+    </script>
+</body>
+</html>
